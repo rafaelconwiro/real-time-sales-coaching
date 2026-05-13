@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sales Coach · Pre-call</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      body { padding: 32px; max-width: 720px; margin: 0 auto; }
+      label { display: block; font-size: 12px; color: #94a3b8; margin: 16px 0 4px; }
+      input, select, textarea {
+        width: 100%;
+        background: #0b0d10;
+        border: 1px solid #1f242b;
+        color: #e7ecef;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+      }
+      textarea { resize: vertical; min-height: 180px; font-family: ui-monospace, Menlo, monospace; line-height: 1.45; }
+      input:focus, select:focus, textarea:focus { outline: none; border-color: #5eead4; }
+      .helper { font-size: 11px; color: #6b7280; margin-top: 4px; }
+      .actions { margin-top: 24px; display: flex; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="title" style="font-size:20px; margin-bottom:6px">Configuracion pre-llamada</div>
+    <div class="helper" style="margin-bottom:20px">
+      Estos datos viajan con la sesion. Gemini Live + el motor de coaching los usaran para ajustar las recomendaciones a TU estrategia.
+    </div>
+
+    <label for="methodology">Metodologia comercial</label>
+    <select id="methodology">
+      <option value="">— Cargando... —</option>
+    </select>
+    <div class="helper">Estructura las etapas, objeciones y senales que el copiloto buscara.</div>
+
+    <label for="prospect-name">Nombre del prospect (opcional)</label>
+    <input id="prospect-name" placeholder="Ej: Maria Lopez" />
+
+    <label for="prospect-company">Empresa del prospect (opcional)</label>
+    <input id="prospect-company" placeholder="Ej: Acme SaaS" />
+
+    <label for="script">Guion / notas para esta llamada</label>
+    <textarea id="script" placeholder="Pega aqui el guion preparado: hooks, preguntas clave, frases especificas que quieres usar, contexto del prospect, hipotesis de valor..."></textarea>
+    <div class="helper">El copiloto priorizara frases y preguntas de este guion cuando encajen en la conversacion.</div>
+
+    <div class="actions">
+      <button id="save" class="btn">Guardar</button>
+      <button id="clear" class="btn secondary">Limpiar guion</button>
+    </div>
+
+    <div id="status" class="card" style="display:none; margin-top:20px"></div>
+
+    <script type="module" src="precall.js"></script>
+  </body>
+</html>

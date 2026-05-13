@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Real-Time Sales Coach",
+  "short_name": "Sales Coach",
+  "version": "0.0.1",
+  "description": "Copiloto silencioso para llamadas B2B. Captura audio de la pestana, transcribe con Gemini Live y sugiere preguntas en vivo.",
+  "minimum_chrome_version": "121",
+  "permissions": [
+    "tabCapture",
+    "activeTab",
+    "tabs",
+    "storage",
+    "offscreen",
+    "sidePanel",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:4000/*",
+    "ws://localhost:4000/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sales Coach"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:4000 http://localhost:4000 ws://127.0.0.1:4000 http://127.0.0.1:4000"
+  }
+}

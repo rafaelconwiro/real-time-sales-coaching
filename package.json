@@ -1,0 +1,25 @@
+{
+  "name": "real-time-sales-coaching",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @rtsc/api run dev",
+    "dev:web": "pnpm --filter @rtsc/web run dev",
+    "dev:ext": "pnpm --filter @rtsc/extension run dev",
+    "build": "pnpm -r run build",
+    "build:ext": "pnpm --filter @rtsc/extension run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "prisma:generate": "pnpm --filter @rtsc/api run prisma:generate",
+    "prisma:migrate": "pnpm --filter @rtsc/api run prisma:migrate",
+    "prisma:seed": "pnpm --filter @rtsc/api run prisma:seed",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "prettier": "^3.3.3"
+  }
+}

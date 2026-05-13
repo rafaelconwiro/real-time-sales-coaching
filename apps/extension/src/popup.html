@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sales Coach</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="popup">
+    <div class="title">Sales Coach</div>
+    <div class="card">
+      <div class="label">Estado</div>
+      <div id="status" class="status">idle</div>
+      <div id="error" class="status error" style="display:none"></div>
+    </div>
+    <div class="row">
+      <button id="start" class="btn">Capturar pestana</button>
+      <button id="stop" class="btn danger" disabled>Parar</button>
+    </div>
+    <div class="row">
+      <button id="open-panel" class="btn secondary" style="flex:1">Abrir panel lateral</button>
+    </div>
+    <div class="row">
+      <button id="open-precall" class="btn secondary" style="flex:1">Configurar pre-llamada</button>
+    </div>
+    <div id="precall-summary" class="card" style="display:none">
+      <div class="label">Pre-call activo</div>
+      <div id="precall-info" class="message"></div>
+    </div>
+    <div class="card">
+      <div class="label">API</div>
+      <input id="api-base" class="status" style="width:100%;background:#0b0d10;border:1px solid #1f242b;color:#e7ecef;padding:4px 6px;border-radius:4px;font-size:11px" />
+    </div>
+    <div class="status">Tip: abre Google Meet / Zoom Web en una pestana y pulsa Capturar. Gemini Live recibe el audio y el panel lateral muestra coaching en tiempo real.</div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  manager
+  seller
+}
+
+enum MethodologyStatus {
+  draft
+  active
+  archived
+}
+
+enum SessionChannel {
+  simulation
+  browser_audio
+  phone
+  video_call
+}
+
+enum SessionStatus {
+  created
+  live
+  ended
+  failed
+}
+
+enum Speaker {
+  seller
+  prospect
+  unknown
+}
+
+enum SignalType {
+  buying_signal
+  risk_signal
+  missing_info
+  competitor
+  urgency
+  budget
+  objection
+}
+
+enum RecommendationType {
+  question
+  argument
+  warning
+  next_step
+  objection_response
+}
+
+enum Priority {
+  low
+  medium
+  high
+}
+
+model Workspace {
+  id            String             @id @default(cuid())
+  name          String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  users         User[]
+  methodologies SalesMethodology[]
+  sessions      CallSession[]
+}
+
+model User {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  email       String       @unique
+  role        UserRole     @default(seller)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  sessions    CallSession[]
+}
+
+model SalesMethodology {
+  id          String             @id @default(cuid())
+  workspaceId String
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  rawContent  String?
+  status      MethodologyStatus  @default(draft)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  stages      PlaybookStage[]
+  objections  PlaybookObjection[]
+  signals     PlaybookSignal[]
+  sessions    CallSession[]
+}
+
+model PlaybookStage {
+  id             String             @id @default(cuid())
+  methodologyId  String
+  methodology    SalesMethodology   @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  name           String
+  order          Int
+  goal           String
+  exitCriteria   String?
+  requiredFields String[]           @default([])
+  questions      PlaybookQuestion[]
+}
+
+model PlaybookQuestion {
+  id       String   @id @default(cuid())
+  stageId  String
+  stage    PlaybookStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  question String
+  purpose  String?
+  priority Priority @default(medium)
+}
+
+model PlaybookObjection {
+  id                    String           @id @default(cuid())
+  methodologyId         String
+  methodology           SalesMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  name                  String
+  detectionExamples     String[]         @default([])
+  recommendedResponse   String
+  recommendedQuestions  String[]         @default([])
+}
+
+model PlaybookSignal {
+  id                String           @id @default(cuid())
+  methodologyId     String
+  methodology       SalesMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  type              SignalType
+  name              String
+  detectionExamples String[]         @default([])
+  recommendedAction String
+}
+
+model CallSession {
+  id              String              @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sellerId        String?
+  seller          User?               @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  methodologyId   String?
+  methodology     SalesMethodology?   @relation(fields: [methodologyId], references: [id], onDelete: SetNull)
+  title           String?
+  channel         SessionChannel      @default(simulation)
+  status          SessionStatus       @default(created)
+  script          String?
+  prospectName    String?
+  prospectCompany String?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  segments        TranscriptSegment[]
+  signals         DetectedSignal[]
+  recommendations LiveRecommendation[]
+  score           CallScore?
+}
+
+model TranscriptSegment {
+  id            String      @id @default(cuid())
+  callSessionId String
+  callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  speaker       Speaker     @default(unknown)
+  text          String
+  isFinal       Boolean     @default(true)
+  startMs       Int?
+  endMs         Int?
+  createdAt     DateTime    @default(now())
+  detectedSignals DetectedSignal[]
+}
+
+model DetectedSignal {
+  id                  String             @id @default(cuid())
+  callSessionId       String
+  callSession         CallSession        @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  transcriptSegmentId String?
+  transcriptSegment   TranscriptSegment? @relation(fields: [transcriptSegmentId], references: [id], onDelete: SetNull)
+  type                SignalType
+  label               String
+  confidence          Float
+  evidence            String
+  createdAt           DateTime           @default(now())
+}
+
+model LiveRecommendation {
+  id              String             @id @default(cuid())
+  callSessionId   String
+  callSession     CallSession        @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  type            RecommendationType
+  title           String
+  message         String
+  suggestedPhrase String?
+  priority        Priority           @default(medium)
+  reason          String
+  dismissed       Boolean            @default(false)
+  accepted        Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+}
+
+model CallScore {
+  id                   String      @id @default(cuid())
+  callSessionId        String      @unique
+  callSession          CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  overallScore         Int
+  discoveryScore       Int
+  qualificationScore   Int
+  objectionScore       Int
+  closingScore         Int
+  methodologyAdherence Int
+  missingFields        String[]    @default([])
+  strengths            String[]    @default([])
+  improvements         String[]    @default([])
+  executiveSummary     String?
+  suggestedEmail       String?
+  createdAt            DateTime    @default(now())
+}

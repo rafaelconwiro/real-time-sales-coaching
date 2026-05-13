@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["chrome"],
+    "outDir": "dist",
+    "noEmit": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@rtsc/shared": ["../../packages/shared/src"]
+    }
+  },
+  "include": ["src/**/*"]
+}

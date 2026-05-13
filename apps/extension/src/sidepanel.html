@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sales Coach · Panel</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="panel">
+    <div class="title">Sales Coach</div>
+    <div id="status" class="status">idle · sin sesion</div>
+
+    <div class="card">
+      <div class="label">Etapa actual</div>
+      <div id="stage" class="value">—</div>
+      <div id="stage-goal" class="message"></div>
+    </div>
+
+    <div class="card" id="rec-card">
+      <div class="label">Recomendacion</div>
+      <div id="rec-title" class="value">Sin recomendacion</div>
+      <div id="rec-message" class="message"></div>
+      <div id="rec-phrase" class="phrase" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">Discovery checklist</div>
+      <div id="fields"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">Senales</div>
+      <div id="signals" class="message">Aun sin senales.</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Transcripcion reciente</div>
+      <div id="transcript" class="transcript">—</div>
+    </div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
