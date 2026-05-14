@@ -1,5 +1,7 @@
 import type { StageName } from "@rtsc/shared";
-import type { CaptureSnapshot, ExtMessage } from "./lib/messages";
+import type { CaptureSnapshot, ExtMessage, PrecallPayload } from "./lib/messages";
+
+const PRECALL_KEY = "precallConfig";
 
 const STAGE_LABEL: Record<StageName, string> = {
   opening: "Apertura",
@@ -32,12 +34,21 @@ const FIELD_LABEL: Record<string, string> = {
 const statusEl = el("status");
 const stageEl = el("stage");
 const stageGoalEl = el("stage-goal");
+const stageExitEl = el("stage-exit");
 const recTitleEl = el("rec-title");
 const recMessageEl = el("rec-message");
 const recPhraseEl = el("rec-phrase");
 const fieldsEl = el("fields");
 const signalsEl = el("signals");
 const transcriptEl = el("transcript");
+const startBtn = el("start") as HTMLButtonElement;
+const pauseBtn = el("pause") as HTMLButtonElement;
+const resumeBtn = el("resume") as HTMLButtonElement;
+const stopBtn = el("stop") as HTMLButtonElement;
+const popoutBtn = el("popout") as HTMLButtonElement;
+const errorEl = el("error");
+const saveTranscriptBtn = el("save-transcript") as HTMLButtonElement;
+const autosaveEl = el("autosave") as HTMLInputElement;
 
 void init();
 
@@ -47,21 +58,170 @@ async function init() {
   chrome.runtime.onMessage.addListener((msg: ExtMessage) => {
     if (msg.type === "snapshot") render(msg.snapshot);
   });
+
+  startBtn.addEventListener("click", startCapture);
+  popoutBtn.addEventListener("click", async () => {
+    await sendMessage({ type: "coach-window:toggle" });
+  });
+
+  chrome.storage.local.get(["autoSaveTranscript"], (r) => {
+    autosaveEl.checked = r.autoSaveTranscript !== false;
+  });
+  autosaveEl.addEventListener("change", () => {
+    chrome.storage.local.set({ autoSaveTranscript: autosaveEl.checked });
+  });
+  saveTranscriptBtn.addEventListener("click", async () => {
+    const snap = (await sendMessage({ type: "sidepanel:get-snapshot" })).data as CaptureSnapshot | undefined;
+    if (!snap?.sessionId) return;
+    const url = `${snap.apiBase}/api/sessions/${snap.sessionId}/export.json`;
+    chrome.downloads.download({
+      url,
+      filename: `salescoach/session-${snap.sessionId.slice(0, 8)}.json`,
+      saveAs: false,
+    });
+  });
+  pauseBtn.addEventListener("click", async () => {
+    pauseBtn.disabled = true;
+    await sendMessage({ type: "popup:pause" });
+  });
+  resumeBtn.addEventListener("click", async () => {
+    resumeBtn.disabled = true;
+    await sendMessage({ type: "popup:resume" });
+  });
+  stopBtn.addEventListener("click", async () => {
+    stopBtn.disabled = true;
+    await sendMessage({ type: "popup:stop" });
+  });
+}
+
+async function startCapture() {
+  startBtn.disabled = true;
+  hideError();
+  try {
+    if (!(await hasMicPermission())) {
+      await chrome.tabs.create({ url: chrome.runtime.getURL("permissions.html") });
+      throw new Error(
+        "Concede permiso de micro en pestana abierta y vuelve a pulsar Capturar.",
+      );
+    }
+    const tab = await getActiveTab();
+    if (!tab?.id) throw new Error("Sin pestana activa");
+    const streamId = await getStreamId(tab.id);
+    const precall = await loadPrecall();
+    const res = await sendMessage({
+      type: "popup:start",
+      streamId,
+      tabId: tab.id,
+      precall,
+    });
+    if (!res.ok) showError(res.error ?? "error");
+  } catch (err) {
+    showError((err as Error).message);
+  }
+}
+
+async function hasMicPermission(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+    return status.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
+async function getActiveTab() {
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tabs[0];
+}
+
+function getStreamId(targetTabId: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId }, (id) => {
+      const err = chrome.runtime.lastError;
+      if (err || !id) reject(new Error(err?.message ?? "no streamId"));
+      else resolve(id);
+    });
+  });
+}
+
+async function loadPrecall(): Promise<PrecallPayload> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([PRECALL_KEY], (res) => {
+      const v = res[PRECALL_KEY] as Partial<PrecallPayload> | undefined;
+      resolve({
+        methodologyId: v?.methodologyId ?? null,
+        prospectId: v?.prospectId ?? null,
+        language: v?.language ?? "es",
+        script: v?.script ?? "",
+        prospectName: v?.prospectName ?? "",
+        prospectCompany: v?.prospectCompany ?? "",
+        prospectNotes: v?.prospectNotes ?? "",
+      });
+    });
+  });
+}
+
+function showError(message: string) {
+  errorEl.textContent = message;
+  errorEl.style.display = "block";
+  startBtn.disabled = false;
+}
+
+function hideError() {
+  errorEl.style.display = "none";
+  errorEl.textContent = "";
 }
 
 function render(s: CaptureSnapshot) {
+  const coach = s.status === "live" || s.status === "paused" ? ` · ${s.coachingStatus}` : "";
   statusEl.textContent =
     s.status === "live"
-      ? `live · ${s.sessionId?.slice(0, 8) ?? ""}`
-      : s.status === "error"
-        ? `error · ${s.errorMessage ?? ""}`
-        : `${s.status} · sin sesion`;
+      ? `live${coach} · ${s.sessionId?.slice(0, 8) ?? ""}`
+      : s.status === "paused"
+        ? `pausado · ${s.sessionId?.slice(0, 8) ?? ""}`
+        : s.status === "error"
+          ? `error · ${s.errorMessage ?? ""}`
+          : `${s.status} · sin sesion`;
   statusEl.className =
     "status" + (s.status === "live" ? " live" : s.status === "error" ? " error" : "");
+
+  const busy = s.status === "starting" || s.status === "stopping";
+  if (s.status === "live") {
+    startBtn.disabled = true;
+    pauseBtn.style.display = "";
+    pauseBtn.disabled = false;
+    resumeBtn.style.display = "none";
+    resumeBtn.disabled = true;
+    stopBtn.disabled = false;
+  } else if (s.status === "paused") {
+    startBtn.disabled = true;
+    pauseBtn.style.display = "none";
+    pauseBtn.disabled = true;
+    resumeBtn.style.display = "";
+    resumeBtn.disabled = false;
+    stopBtn.disabled = false;
+  } else {
+    startBtn.disabled = busy;
+    pauseBtn.style.display = "";
+    pauseBtn.disabled = true;
+    resumeBtn.style.display = "none";
+    resumeBtn.disabled = true;
+    stopBtn.disabled = true;
+  }
+
+  if (s.status === "error" && s.errorMessage) {
+    errorEl.textContent = s.errorMessage;
+    errorEl.style.display = "block";
+  } else if (s.status !== "error") {
+    errorEl.style.display = "none";
+  }
+
+  saveTranscriptBtn.disabled = !s.sessionId;
 
   const stage = (s.state?.stage ?? "opening") as StageName;
   stageEl.textContent = STAGE_LABEL[stage] ?? stage;
   stageGoalEl.textContent = STAGE_GOAL[stage] ?? "";
+  stageExitEl.textContent = s.exitCriteria ? `Exit: ${s.exitCriteria}` : "";
 
   const rec = s.recommendations[0];
   if (rec) {

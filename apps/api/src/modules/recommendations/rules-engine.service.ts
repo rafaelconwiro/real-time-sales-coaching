@@ -11,6 +11,24 @@ interface PlaybookContext {
   }[];
 }
 
+const SELLER_PITCH_PATTERNS: RegExp[] = [
+  /\bnuestra plataforma\b/i,
+  /\bnuestro producto\b/i,
+  /\bofrecemos\b/i,
+  /\bte explico como funciona\b/i,
+  /\bel precio es\b/i,
+  /\bcuesta\s+\d/i,
+  /\bcaracteristicas\b/i,
+  /\bdemo\b.*\b(modulo|funcion)/i,
+];
+
+const SELLER_ANSWERING_PATTERNS: RegExp[] = [
+  /^si,? /i,
+  /^claro,? /i,
+  /^exacto,? /i,
+  /^correcto,? /i,
+];
+
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   budget: [/presupuesto/i, /\bcoste\b/i, /\bprecio\b/i, /\beuros?\b/i, /\$\s?\d/, /\bcuesta\b/i],
   pain: [/problema/i, /dolor/i, /no funciona/i, /ineficiente/i, /perdemos/i, /tarda mucho/i],
@@ -38,6 +56,36 @@ const STAGE_BY_INDEX: Record<number, string> = {
 
 @Injectable()
 export class RulesEngineService {
+  detectPrematurePitch(input: {
+    sellerText: string;
+    stage: string;
+    knownFields: Record<string, string | null>;
+    requiredEarlyFields: string[];
+  }): { reason: string; phrase: string } | null {
+    const lower = input.sellerText.toLowerCase();
+    const pitching = SELLER_PITCH_PATTERNS.some((p) => p.test(lower));
+    if (!pitching) return null;
+    if (input.stage === "solution_framing" || input.stage === "closing" || input.stage === "next_steps") {
+      return null;
+    }
+    const missingEarly = input.requiredEarlyFields.filter((f) => !input.knownFields[f]);
+    if (missingEarly.length === 0) return null;
+    return {
+      reason: `Pitch antes de descubrir: faltan ${missingEarly.join(", ")}`,
+      phrase: `Antes de entrar en como lo resolveriamos, ¿podrias contarme un poco mas sobre ${missingEarly[0]}?`,
+    };
+  }
+
+  detectAnsweringInsteadOfAsking(sellerText: string): { reason: string; phrase: string } | null {
+    if (!SELLER_ANSWERING_PATTERNS.some((p) => p.test(sellerText))) return null;
+    if (sellerText.includes("?")) return null;
+    if (sellerText.length < 60) return null;
+    return {
+      reason: "Respondiendo afirmando en vez de devolver pregunta",
+      phrase: "¿Que te hace preguntar eso?",
+    };
+  }
+
   analyze(
     recentText: string,
     playbook: PlaybookContext,

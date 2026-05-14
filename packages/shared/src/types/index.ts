@@ -1,6 +1,15 @@
 export type SessionChannel = "simulation" | "browser_audio" | "phone" | "video_call";
 export type SessionStatus = "created" | "live" | "ended" | "failed";
 export type Speaker = "seller" | "prospect" | "unknown";
+export type CallTag = "won" | "lost" | "follow_up";
+export type CallLanguage = "es" | "en";
+export type CoachingStatus =
+  | "idle"
+  | "listening"
+  | "analyzing"
+  | "coaching"
+  | "paused"
+  | "error";
 
 export type StageName =
   | "opening"

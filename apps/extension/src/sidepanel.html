@@ -10,14 +10,26 @@
     <div class="title">Sales Coach</div>
     <div id="status" class="status">idle · sin sesion</div>
 
+    <div class="row" style="margin:8px 0">
+      <button id="start" class="btn">Capturar pestana</button>
+      <button id="pause" class="btn secondary" disabled>Pausa</button>
+      <button id="resume" class="btn secondary" disabled style="display:none">Reanudar</button>
+      <button id="stop" class="btn danger" disabled>Apagar</button>
+    </div>
+    <div id="error" class="status error" style="display:none; margin-bottom:8px"></div>
+
     <div class="card">
       <div class="label">Etapa actual</div>
       <div id="stage" class="value">—</div>
       <div id="stage-goal" class="message"></div>
+      <div id="stage-exit" class="message" style="margin-top:6px;color:#7dd3fc"></div>
     </div>
 
     <div class="card" id="rec-card">
-      <div class="label">Recomendacion</div>
+      <div class="label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Recomendacion</span>
+        <button id="popout" class="btn secondary" style="padding:2px 8px;font-size:10px">Sacar popup</button>
+      </div>
       <div id="rec-title" class="value">Sin recomendacion</div>
       <div id="rec-message" class="message"></div>
       <div id="rec-phrase" class="phrase" style="display:none"></div>
@@ -34,8 +46,15 @@
     </div>
 
     <div class="card">
-      <div class="label">Transcripcion reciente</div>
+      <div class="label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Transcripcion reciente</span>
+        <button id="save-transcript" class="btn secondary" style="padding:2px 8px;font-size:10px" disabled>Guardar local</button>
+      </div>
       <div id="transcript" class="transcript">—</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin-top:6px">
+        <input id="autosave" type="checkbox" checked />
+        Auto-guardar JSON al terminar
+      </label>
     </div>
 
     <script type="module" src="sidepanel.js"></script>

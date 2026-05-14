@@ -1,5 +1,6 @@
 import type {
   CallScorePayload,
+  CoachingStatus,
   ConversationStatePayload,
   DetectedSignalPayload,
   LiveRecommendationPayload,
@@ -11,6 +12,8 @@ import type {
 export const ClientEvents = {
   SessionStart: "client:session.start",
   SessionEnd: "client:session.end",
+  SessionPause: "client:session.pause",
+  SessionResume: "client:session.resume",
   AudioChunk: "client:audio.chunk",
   TranscriptManualChunk: "client:transcript.manual_chunk",
   RecommendationDismiss: "client:recommendation.dismiss",
@@ -25,6 +28,10 @@ export const ServerEvents = {
   SignalDetected: "server:signal.detected",
   RecommendationCreated: "server:recommendation.created",
   StateUpdated: "server:state.updated",
+  StatusChanged: "server:status.changed",
+  SessionPaused: "server:session.paused",
+  SessionResumed: "server:session.resumed",
+  PauseDetected: "server:pause.detected",
   SessionScoreUpdated: "server:session.score.updated",
   Error: "server:error",
 } as const;
@@ -49,6 +56,36 @@ export interface ClientAudioChunkPayload {
   sessionId: string;
   audioBase64: string;
   mimeType: string;
+  channel?: "seller" | "prospect" | "mixed";
+}
+
+export interface ClientSessionPausePayload {
+  sessionId: string;
+}
+
+export interface ClientSessionResumePayload {
+  sessionId: string;
+}
+
+export interface ServerStatusChangedPayload {
+  sessionId: string;
+  status: CoachingStatus;
+}
+
+export interface ServerSessionPausedPayload {
+  sessionId: string;
+  at: string;
+}
+
+export interface ServerSessionResumedPayload {
+  sessionId: string;
+  at: string;
+}
+
+export interface ServerPauseDetectedPayload {
+  sessionId: string;
+  durationMs: number;
+  at: string;
 }
 
 export interface ServerSessionReadyPayload {

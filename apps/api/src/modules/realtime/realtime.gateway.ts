@@ -13,25 +13,38 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { CallSessionsService } from "../call-sessions/call-sessions.service";
 import { RecommendationService } from "../recommendations/recommendation.service";
 import { ScoringService } from "../scoring/scoring.service";
-import { GeminiLiveService } from "../transcription/gemini-live.service";
+import { GeminiLiveService, type LiveChannel } from "../transcription/gemini-live.service";
 import {
   ClientEvents,
   ServerEvents,
   type ClientAudioChunkPayload,
   type ClientSessionEndPayload,
+  type ClientSessionPausePayload,
+  type ClientSessionResumePayload,
   type ClientSessionStartPayload,
   type ClientTranscriptManualChunkPayload,
+  type CoachingStatus,
+  type ServerPauseDetectedPayload,
   type ServerRecommendationCreatedPayload,
+  type ServerSessionPausedPayload,
+  type ServerSessionResumedPayload,
   type ServerSessionReadyPayload,
   type ServerSignalDetectedPayload,
   type ServerStateUpdatedPayload,
+  type ServerStatusChangedPayload,
   type ServerTranscriptPayload,
+  type Speaker,
 } from "@rtsc/shared";
+
+const PAUSE_THRESHOLD_MS = 8000;
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly socketSession = new Map<string, string>();
+  private readonly paused = new Set<string>();
+  private readonly lastSegmentAt = new Map<string, number>();
+  private readonly audioChunkCount = new Map<string, number>();
   @WebSocketServer() server!: Server;
 
   constructor(
@@ -56,9 +69,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
 
   private async cleanupSession(sessionId: string, reason: "disconnect" | "end") {
     this.audioChunkCount.delete(sessionId);
-    const live = this.geminiLive.get(sessionId);
-    if (live) {
-      this.logger.log(`Closing Gemini Live for ${sessionId} (${reason})`);
+    this.paused.delete(sessionId);
+    this.lastSegmentAt.delete(sessionId);
+    const lives = this.geminiLive.getAllForSession(sessionId);
+    for (const live of lives) {
+      this.logger.log(`Closing Gemini Live for ${sessionId} ch=${live.channel} (${reason})`);
       try {
         await live.close();
       } catch (err) {
@@ -71,6 +86,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
       // already ended
     }
     if (reason === "end") {
+      this.emitStatus(sessionId, "idle");
       try {
         const summary = await this.scoring.finalize(sessionId);
         this.server.to(this.room(sessionId)).emit(ServerEvents.SessionScoreUpdated, {
@@ -115,6 +131,26 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
       },
     };
     client.emit(ServerEvents.SessionReady, ready);
+    this.emitStatus(session.id, "listening");
+  }
+
+  @SubscribeMessage(ClientEvents.SessionPause)
+  async onSessionPause(@MessageBody() payload: ClientSessionPausePayload) {
+    this.paused.add(payload.sessionId);
+    const at = new Date().toISOString();
+    const event: ServerSessionPausedPayload = { sessionId: payload.sessionId, at };
+    this.server.to(this.room(payload.sessionId)).emit(ServerEvents.SessionPaused, event);
+    this.emitStatus(payload.sessionId, "paused");
+  }
+
+  @SubscribeMessage(ClientEvents.SessionResume)
+  async onSessionResume(@MessageBody() payload: ClientSessionResumePayload) {
+    this.paused.delete(payload.sessionId);
+    this.lastSegmentAt.set(payload.sessionId, Date.now());
+    const at = new Date().toISOString();
+    const event: ServerSessionResumedPayload = { sessionId: payload.sessionId, at };
+    this.server.to(this.room(payload.sessionId)).emit(ServerEvents.SessionResumed, event);
+    this.emitStatus(payload.sessionId, "listening");
   }
 
   @SubscribeMessage(ClientEvents.TranscriptManualChunk)
@@ -122,6 +158,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
     @MessageBody() payload: ClientTranscriptManualChunkPayload,
     @ConnectedSocket() client: Socket,
   ) {
+    if (this.paused.has(payload.sessionId)) return;
     await this.ingestText({
       sessionId: payload.sessionId,
       speaker: payload.speaker,
@@ -131,13 +168,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
   }
 
-  private audioChunkCount = new Map<string, number>();
-
   @SubscribeMessage(ClientEvents.AudioChunk)
   async onAudioChunk(
     @MessageBody() payload: ClientAudioChunkPayload,
     @ConnectedSocket() client: Socket,
   ) {
+    if (this.paused.has(payload.sessionId)) return;
     if (!this.geminiLive.isEnabled()) {
       client.emit(ServerEvents.Error, {
         sessionId: payload.sessionId,
@@ -147,18 +183,19 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
       this.logger.warn(`Audio chunk dropped: Gemini Live disabled`);
       return;
     }
-    let handle = this.geminiLive.get(payload.sessionId);
+    const channel: LiveChannel = (payload.channel ?? "mixed") as LiveChannel;
+    let handle = this.geminiLive.get(payload.sessionId, channel);
     if (!handle) {
-      this.logger.log(`Opening Gemini Live session for ${payload.sessionId}`);
+      const speakerForChannel: Speaker =
+        channel === "seller" ? "seller" : channel === "prospect" ? "prospect" : "unknown";
+      this.logger.log(`Opening Gemini Live for ${payload.sessionId} ch=${channel}`);
       handle = (await this.geminiLive.openSession({
         sessionId: payload.sessionId,
+        channel,
         onTranscript: async (text, isFinal) => {
-          this.logger.debug(
-            `[live ${payload.sessionId.slice(0, 8)}] transcript ${isFinal ? "final" : "partial"}: ${text.slice(0, 80)}`,
-          );
           await this.ingestText({
             sessionId: payload.sessionId,
-            speaker: "prospect",
+            speaker: speakerForChannel,
             text,
             isFinal,
             client,
@@ -173,20 +210,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
           });
         },
       })) ?? undefined;
-      if (handle) {
-        this.logger.log(`Gemini Live session OPEN for ${payload.sessionId}`);
-      } else {
-        this.logger.error(`Gemini Live openSession returned null for ${payload.sessionId}`);
-      }
     }
     if (!handle) return;
     await handle.sendAudioChunk(payload.audioBase64, payload.mimeType);
-    const count = (this.audioChunkCount.get(payload.sessionId) ?? 0) + 1;
-    this.audioChunkCount.set(payload.sessionId, count);
-    if (count === 1 || count % 50 === 0) {
-      this.logger.debug(
-        `[live ${payload.sessionId.slice(0, 8)}] forwarded ${count} audio chunks to Gemini`,
-      );
+    const countKey = `${payload.sessionId}:${channel}`;
+    const count = (this.audioChunkCount.get(countKey) ?? 0) + 1;
+    this.audioChunkCount.set(countKey, count);
+    if (count === 1 || count % 100 === 0) {
+      this.logger.debug(`[live ${payload.sessionId.slice(0, 8)}/${channel}] ${count} chunks`);
     }
   }
 
@@ -197,11 +228,23 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
 
   private async ingestText(input: {
     sessionId: string;
-    speaker: ClientTranscriptManualChunkPayload["speaker"];
+    speaker: Speaker;
     text: string;
     isFinal: boolean;
     client: Socket;
   }) {
+    const now = Date.now();
+    const last = this.lastSegmentAt.get(input.sessionId);
+    if (last && now - last > PAUSE_THRESHOLD_MS) {
+      const event: ServerPauseDetectedPayload = {
+        sessionId: input.sessionId,
+        durationMs: now - last,
+        at: new Date(now).toISOString(),
+      };
+      this.server.to(this.room(input.sessionId)).emit(ServerEvents.PauseDetected, event);
+    }
+    this.lastSegmentAt.set(input.sessionId, now);
+
     const segment = await this.prisma.transcriptSegment.create({
       data: {
         callSessionId: input.sessionId,
@@ -230,6 +273,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
       );
 
     if (!input.isFinal) return;
+
+    this.emitStatus(input.sessionId, "analyzing");
 
     const session = await this.prisma.callSession.findUnique({
       where: { id: input.sessionId },
@@ -268,6 +313,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
     }
 
     if (result.recommendation) {
+      this.emitStatus(input.sessionId, "coaching");
       const recPayload: ServerRecommendationCreatedPayload = {
         sessionId: input.sessionId,
         recommendation: result.recommendation,
@@ -275,7 +321,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect {
       this.server
         .to(this.room(input.sessionId))
         .emit(ServerEvents.RecommendationCreated, recPayload);
+      setTimeout(() => this.emitStatus(input.sessionId, "listening"), 2000);
+    } else {
+      this.emitStatus(input.sessionId, "listening");
     }
+  }
+
+  private emitStatus(sessionId: string, status: CoachingStatus) {
+    const payload: ServerStatusChangedPayload = { sessionId, status };
+    this.server.to(this.room(sessionId)).emit(ServerEvents.StatusChanged, payload);
   }
 
   private room(sessionId: string) {

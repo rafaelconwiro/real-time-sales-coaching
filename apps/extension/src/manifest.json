@@ -12,7 +12,8 @@
     "storage",
     "offscreen",
     "sidePanel",
-    "scripting"
+    "scripting",
+    "downloads"
   ],
   "host_permissions": [
     "http://localhost:4000/*",

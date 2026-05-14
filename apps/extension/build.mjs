@@ -17,6 +17,7 @@ const entryPoints = {
   sidepanel: "src/sidepanel.ts",
   permissions: "src/permissions.ts",
   precall: "src/precall.ts",
+  "coach-popup": "src/coach-popup.ts",
 };
 
 const ctx = await esbuild.context({
@@ -40,6 +41,7 @@ async function copyAssets() {
     "offscreen.html",
     "permissions.html",
     "precall.html",
+    "coach-popup.html",
     "styles.css",
   ]) {
     const src = join("src", file);

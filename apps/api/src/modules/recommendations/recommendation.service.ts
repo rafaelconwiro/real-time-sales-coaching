@@ -142,6 +142,72 @@ export class RecommendationService {
       }
     }
 
+    if (params.speaker === "seller") {
+      const earlyRequired = playbook.stages
+        .filter((s) => s.order <= 2)
+        .flatMap((s) => s.requiredFields);
+      const premature = this.rules.detectPrematurePitch({
+        sellerText: params.text,
+        stage: analysis.stage,
+        knownFields: analysis.knownFields,
+        requiredEarlyFields: Array.from(new Set(earlyRequired)),
+      });
+      if (premature) {
+        const key = `warning:premature_pitch`;
+        if (this.conversation.shouldEmitRecommendation(params.sessionId, key)) {
+          const saved = await this.prisma.liveRecommendation.create({
+            data: {
+              callSessionId: params.sessionId,
+              type: "warning" as never,
+              title: "Pitch antes de tiempo",
+              message: premature.reason,
+              suggestedPhrase: premature.phrase,
+              priority: "high" as never,
+              reason: premature.reason,
+            },
+          });
+          recommendation = {
+            id: saved.id,
+            type: saved.type as LiveRecommendationPayload["type"],
+            title: saved.title,
+            message: saved.message,
+            suggestedPhrase: saved.suggestedPhrase,
+            priority: saved.priority as LiveRecommendationPayload["priority"],
+            reason: saved.reason,
+            createdAt: saved.createdAt.toISOString(),
+          };
+        }
+      } else {
+        const answering = this.rules.detectAnsweringInsteadOfAsking(params.text);
+        if (answering) {
+          const key = `warning:answering_not_asking`;
+          if (this.conversation.shouldEmitRecommendation(params.sessionId, key)) {
+            const saved = await this.prisma.liveRecommendation.create({
+              data: {
+                callSessionId: params.sessionId,
+                type: "warning" as never,
+                title: "Estas respondiendo, no preguntando",
+                message: answering.reason,
+                suggestedPhrase: answering.phrase,
+                priority: "medium" as never,
+                reason: answering.reason,
+              },
+            });
+            recommendation = recommendation ?? {
+              id: saved.id,
+              type: saved.type as LiveRecommendationPayload["type"],
+              title: saved.title,
+              message: saved.message,
+              suggestedPhrase: saved.suggestedPhrase,
+              priority: saved.priority as LiveRecommendationPayload["priority"],
+              reason: saved.reason,
+              createdAt: saved.createdAt.toISOString(),
+            };
+          }
+        }
+      }
+    }
+
     const updatedState = this.conversation.get(params.sessionId)!;
     const statePayload: ConversationStatePayload = {
       stage: updatedState.stage,

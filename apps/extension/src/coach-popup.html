@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Coach</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      html, body {
+        margin: 0;
+        background: #0b0d10;
+        color: #e7ecef;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+      }
+      .float {
+        padding: 12px 14px;
+        height: 100vh;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .float-status {
+        font-size: 10px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .float-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #e7ecef;
+      }
+      .float-message {
+        font-size: 12px;
+        color: #94a3b8;
+        line-height: 1.4;
+      }
+      .float-phrase {
+        margin-top: auto;
+        padding: 8px 10px;
+        background: rgba(94, 234, 212, 0.08);
+        border-left: 2px solid #5eead4;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #5eead4;
+        font-style: italic;
+        line-height: 1.4;
+      }
+      .float-empty {
+        font-size: 12px;
+        color: #6b7280;
+        margin: auto;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body class="float-body">
+    <div class="float">
+      <div id="status" class="float-status">idle</div>
+      <div id="title" class="float-title">Sin recomendacion</div>
+      <div id="message" class="float-message"></div>
+      <div id="phrase" class="float-phrase" style="display:none"></div>
+    </div>
+    <script type="module" src="coach-popup.js"></script>
+  </body>
+</html>

@@ -5,6 +5,7 @@ import { HealthController } from "./common/health.controller";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 import { PlaybooksModule } from "./modules/playbooks/playbooks.module";
 import { CallSessionsModule } from "./modules/call-sessions/call-sessions.module";
+import { ProspectsModule } from "./modules/prospects/prospects.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RecommendationsModule } from "./modules/recommendations/recommendations.module";
 import { ScoringModule } from "./modules/scoring/scoring.module";
@@ -22,6 +23,7 @@ import configuration from "./config/configuration";
     WorkspacesModule,
     PlaybooksModule,
     CallSessionsModule,
+    ProspectsModule,
     RecommendationsModule,
     ScoringModule,
     TranscriptionModule,

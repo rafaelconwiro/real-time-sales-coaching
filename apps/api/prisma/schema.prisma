@@ -49,6 +49,17 @@ enum SignalType {
   objection
 }
 
+enum CallTag {
+  won
+  lost
+  follow_up
+}
+
+enum CallLanguage {
+  es
+  en
+}
+
 enum RecommendationType {
   question
   argument
@@ -64,13 +75,27 @@ enum Priority {
 }
 
 model Workspace {
-  id            String             @id @default(cuid())
-  name          String
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  users         User[]
-  methodologies SalesMethodology[]
-  sessions      CallSession[]
+  id             String             @id @default(cuid())
+  name           String
+  precallConfig  Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  users          User[]
+  methodologies  SalesMethodology[]
+  sessions       CallSession[]
+  prospects      Prospect[]
+}
+
+model Prospect {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  company     String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  sessions    CallSession[]
 }
 
 model User {
@@ -86,19 +111,33 @@ model User {
 }
 
 model SalesMethodology {
-  id          String             @id @default(cuid())
-  workspaceId String
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  rawContent  String?
-  status      MethodologyStatus  @default(draft)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  stages      PlaybookStage[]
-  objections  PlaybookObjection[]
-  signals     PlaybookSignal[]
-  sessions    CallSession[]
+  id             String                @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  rawContent     String?
+  status         MethodologyStatus     @default(draft)
+  currentVersion Int                   @default(1)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  stages         PlaybookStage[]
+  objections     PlaybookObjection[]
+  signals        PlaybookSignal[]
+  sessions       CallSession[]
+  versions       MethodologyVersion[]
+}
+
+model MethodologyVersion {
+  id            String           @id @default(cuid())
+  methodologyId String
+  methodology   SalesMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  version       Int
+  label         String?
+  snapshot      Json
+  createdAt     DateTime         @default(now())
+
+  @@unique([methodologyId, version])
 }
 
 model PlaybookStage {
@@ -150,12 +189,16 @@ model CallSession {
   seller          User?               @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   methodologyId   String?
   methodology     SalesMethodology?   @relation(fields: [methodologyId], references: [id], onDelete: SetNull)
+  prospectId      String?
+  prospect        Prospect?           @relation(fields: [prospectId], references: [id], onDelete: SetNull)
   title           String?
   channel         SessionChannel      @default(simulation)
   status          SessionStatus       @default(created)
   script          String?
   prospectName    String?
   prospectCompany String?
+  language        CallLanguage        @default(es)
+  tag             CallTag?
   startedAt       DateTime?
   endedAt         DateTime?
   createdAt       DateTime            @default(now())

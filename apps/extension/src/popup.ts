@@ -6,10 +6,16 @@ const PRECALL_KEY = "precallConfig";
 async function loadPrecall(): Promise<PrecallPayload> {
   return new Promise((resolve) => {
     chrome.storage.local.get([PRECALL_KEY], (res) => {
-      const v = res[PRECALL_KEY] as PrecallPayload | undefined;
-      resolve(
-        v ?? { methodologyId: null, script: "", prospectName: "", prospectCompany: "" },
-      );
+      const v = res[PRECALL_KEY] as Partial<PrecallPayload> | undefined;
+      resolve({
+        methodologyId: v?.methodologyId ?? null,
+        prospectId: v?.prospectId ?? null,
+        language: v?.language ?? "es",
+        script: v?.script ?? "",
+        prospectName: v?.prospectName ?? "",
+        prospectCompany: v?.prospectCompany ?? "",
+        prospectNotes: v?.prospectNotes ?? "",
+      });
     });
   });
 }
@@ -17,6 +23,8 @@ async function loadPrecall(): Promise<PrecallPayload> {
 const statusEl = document.getElementById("status") as HTMLDivElement;
 const errorEl = document.getElementById("error") as HTMLDivElement;
 const startBtn = document.getElementById("start") as HTMLButtonElement;
+const pauseBtn = document.getElementById("pause") as HTMLButtonElement;
+const resumeBtn = document.getElementById("resume") as HTMLButtonElement;
 const stopBtn = document.getElementById("stop") as HTMLButtonElement;
 const openPanelBtn = document.getElementById("open-panel") as HTMLButtonElement;
 const openPrecallBtn = document.getElementById("open-precall") as HTMLButtonElement;
@@ -61,6 +69,16 @@ async function init() {
       showError((err as Error).message);
     }
   });
+  pauseBtn.addEventListener("click", async () => {
+    pauseBtn.disabled = true;
+    const res = await sendMessage({ type: "popup:pause" });
+    if (!res.ok) showError(res.error ?? "error");
+  });
+  resumeBtn.addEventListener("click", async () => {
+    resumeBtn.disabled = true;
+    const res = await sendMessage({ type: "popup:resume" });
+    if (!res.ok) showError(res.error ?? "error");
+  });
   stopBtn.addEventListener("click", async () => {
     stopBtn.disabled = true;
     const res = await sendMessage({ type: "popup:stop" });
@@ -89,8 +107,11 @@ async function refresh() {
 }
 
 function render(s: CaptureSnapshot) {
-  statusEl.textContent = labelFor(s.status) + (s.sessionId ? ` · ${s.sessionId.slice(0, 8)}` : "");
-  statusEl.className = "status" + (s.status === "live" ? " live" : s.status === "error" ? " error" : "");
+  const coach = s.status === "live" ? ` (${s.coachingStatus})` : "";
+  statusEl.textContent =
+    labelFor(s.status) + coach + (s.sessionId ? ` · ${s.sessionId.slice(0, 8)}` : "");
+  statusEl.className =
+    "status" + (s.status === "live" ? " live" : s.status === "error" ? " error" : "");
   if (s.status === "error" && s.errorMessage) {
     errorEl.textContent = s.errorMessage;
     errorEl.style.display = "block";
@@ -98,8 +119,24 @@ function render(s: CaptureSnapshot) {
     errorEl.style.display = "none";
   }
   const busy = s.status === "starting" || s.status === "stopping";
-  startBtn.disabled = busy || s.status === "live";
-  stopBtn.disabled = busy || s.status !== "live";
+  startBtn.disabled = busy || s.status === "live" || s.status === "paused";
+  stopBtn.disabled = busy || (s.status !== "live" && s.status !== "paused");
+  if (s.status === "live") {
+    pauseBtn.style.display = "";
+    pauseBtn.disabled = false;
+    resumeBtn.style.display = "none";
+    resumeBtn.disabled = true;
+  } else if (s.status === "paused") {
+    pauseBtn.style.display = "none";
+    pauseBtn.disabled = true;
+    resumeBtn.style.display = "";
+    resumeBtn.disabled = false;
+  } else {
+    pauseBtn.style.display = "";
+    pauseBtn.disabled = true;
+    resumeBtn.style.display = "none";
+    resumeBtn.disabled = true;
+  }
 }
 
 function labelFor(status: CaptureSnapshot["status"]): string {
@@ -110,6 +147,8 @@ function labelFor(status: CaptureSnapshot["status"]): string {
       return "iniciando...";
     case "live":
       return "live";
+    case "paused":
+      return "pausado";
     case "stopping":
       return "parando...";
     case "error":
