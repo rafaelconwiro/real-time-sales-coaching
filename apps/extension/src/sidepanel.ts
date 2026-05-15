@@ -89,8 +89,13 @@ async function init() {
     await sendMessage({ type: "popup:resume" });
   });
   stopBtn.addEventListener("click", async () => {
+    hideError();
     stopBtn.disabled = true;
-    await sendMessage({ type: "popup:stop" });
+    const res = await sendMessage({ type: "popup:stop" });
+    if (!res.ok) {
+      showError(res.error ?? "no se pudo apagar");
+      stopBtn.disabled = false;
+    }
   });
 }
 
@@ -186,6 +191,7 @@ function render(s: CaptureSnapshot) {
     "status" + (s.status === "live" ? " live" : s.status === "error" ? " error" : "");
 
   const busy = s.status === "starting" || s.status === "stopping";
+  const hasSession = !!s.sessionId;
   if (s.status === "live") {
     startBtn.disabled = true;
     pauseBtn.style.display = "";
@@ -206,7 +212,7 @@ function render(s: CaptureSnapshot) {
     pauseBtn.disabled = true;
     resumeBtn.style.display = "none";
     resumeBtn.disabled = true;
-    stopBtn.disabled = true;
+    stopBtn.disabled = !hasSession;
   }
 
   if (s.status === "error" && s.errorMessage) {

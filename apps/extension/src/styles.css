@@ -27,20 +27,22 @@ html, body {
 .row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
+.row > .btn { flex: 1 1 auto; min-width: 0; }
 
 .btn {
   background: #5eead4;
   color: #0b0d10;
   border: none;
   border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }

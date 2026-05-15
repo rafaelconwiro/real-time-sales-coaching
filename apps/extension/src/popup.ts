@@ -119,8 +119,9 @@ function render(s: CaptureSnapshot) {
     errorEl.style.display = "none";
   }
   const busy = s.status === "starting" || s.status === "stopping";
+  const hasSession = !!s.sessionId;
   startBtn.disabled = busy || s.status === "live" || s.status === "paused";
-  stopBtn.disabled = busy || (s.status !== "live" && s.status !== "paused");
+  stopBtn.disabled = busy ? false : !(hasSession || s.status === "live" || s.status === "paused");
   if (s.status === "live") {
     pauseBtn.style.display = "";
     pauseBtn.disabled = false;
